@@ -161,27 +161,42 @@ echo "xcframework → ${FW}/llama.xcframework"
 echo "building the SME2 attention kernel for iOS"
 xcrun -sdk iphoneos clang -c -O3 -isysroot "$(xcrun --sdk iphoneos --show-sdk-path)" -target arm64-apple-ios16.4 \
   -mcpu=apple-a18 -ffile-prefix-map="${ROOT}"=. -DSME_BENCH_MAIN -DSME_BENCH_NO_MAIN "${ROOT}/scripts/sme/sme_attn.c" -o "${IOS}/Sidecar/sme_attn_ios.o"
-echo "archiving the app (no debugger, no DDI)"
+echo "building the app (no debugger, no DDI)"
 cd "${IOS}"
 mkdir -p "${ROOT}/ios/build"
 if [[ "${IPA}" == 1 ]]; then
   # unsigned: AltStore signs it on the phone with the user's own Apple ID (and appends that team id to the bundle id)
   SIGN_ARGS=(CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY= DEVELOPMENT_TEAM= PRODUCT_BUNDLE_IDENTIFIER=app.backburner.sidecar)
 else
-  SIGN_ARGS=(-allowProvisioningUpdates DEVELOPMENT_TEAM="${TEAM}" CODE_SIGN_STYLE=Automatic)
+  SIGN_ARGS=(-allowProvisioningUpdates -allowProvisioningDeviceRegistration DEVELOPMENT_TEAM="${TEAM}"
+             CODE_SIGN_STYLE=Automatic)
 fi
-xcodebuild \
-  -project Sidecar.xcodeproj \
-  -scheme Sidecar \
-  -configuration Release \
-  -destination "generic/platform=iOS" \
-  "${SIGN_ARGS[@]}" \
-  -archivePath "${ROOT}/ios/build/Sidecar.xcarchive" \
-  archive
+if [[ "${IPA}" != 1 && -n "${UDID}" ]]; then
+  # A free personal team gets a profile only for a registered device, and an archive (generic iOS) never registers
+  # one: build for this device instead, which registers it.
+  xcodebuild \
+    -project Sidecar.xcodeproj \
+    -scheme Sidecar \
+    -configuration Release \
+    -destination "id=${UDID}" \
+    "${SIGN_ARGS[@]}" \
+    -derivedDataPath "${ROOT}/ios/build/dd" \
+    build
+  APP="${ROOT}/ios/build/dd/Build/Products/Release-iphoneos/Sidecar.app"
+else
+  xcodebuild \
+    -project Sidecar.xcodeproj \
+    -scheme Sidecar \
+    -configuration Release \
+    -destination "generic/platform=iOS" \
+    "${SIGN_ARGS[@]}" \
+    -archivePath "${ROOT}/ios/build/Sidecar.xcarchive" \
+    archive
+  APP="${ROOT}/ios/build/Sidecar.xcarchive/Products/Applications/Sidecar.app"
+fi
 
-APP="${ROOT}/ios/build/Sidecar.xcarchive/Products/Applications/Sidecar.app"
 if [[ ! -d "${APP}" ]]; then
-  echo "archive produced no Sidecar.app"
+  echo "the build produced no Sidecar.app"
   ls -R "${ROOT}/ios/build" | head
   exit 1
 fi

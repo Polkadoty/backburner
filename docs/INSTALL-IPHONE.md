@@ -11,10 +11,15 @@ Two ways. Both give the same app; the Mac scripts find it on the phone either wa
 You need an iPhone 15 Pro or newer, or an iPad with an M-series chip (M1 or newer). The A19 Pro (iPhone 17 Pro / Pro Max)
 has the GPU matrix units that make the phone's half of prefill 2.4x faster; the A18 Pro works but helps less.
 
-**iPads** install the same app (v0.0.2 and newer) and every step below is the same. iPads are **not tested yet**: we
-don't know how much memory iPadOS gives the app (step 5 prints it), or how fast an M-series iPad runs its layers. If you
-try one, please [post your results](https://github.com/StayLameBro/backburner/issues/new?template=results.yml), including
-the `app budget` line. The app runs full screen on iPad (no Split View), because it has to stay in front while the Mac uses it.
+**iPads** install the same app (v0.0.2 and newer) and every step below is the same. One iPad is measured so far: an
+iPad Pro 11-inch (M5) on iPadOS 27 gave the app a 12,119 MiB budget and ran layers 49-64 at ~410 ms per 256-token
+ubatch. If you try another, please [post your results](https://github.com/StayLameBro/backburner/issues/new?template=results.yml),
+including the `app budget` line. The app runs full screen on iPad (no Split View), because it has to stay in front while the
+Mac uses it.
+
+**Check the cable's link speed.** System Information → USB → iPhone (or iPad) → Link Speed should read 5 or 10 Gb/s.
+480 Mb/s means the cable carries USB 2 data, whatever its label says: copies then run at ~40 MB/s, and split prefill comes
+out slower than the Mac alone.
 
 ## With AltStore (no developer account)
 
@@ -79,6 +84,21 @@ UDID=<your iPhone's UDID> scripts/build-iphone.sh
 ```
 
 It builds llama.cpp for iOS, the SME2 attention kernel and the app, signs it as `app.backburner.<team id>` and installs it.
+
+A free Apple ID works too: add it in Xcode → Settings → Accounts and use its "(Personal Team)" id. With `UDID` set the
+script builds for that device, which registers it with the team; a free team has no profile until it does. Before the
+first build:
+
+1. Unlock the device and tap Trust when it asks about the Mac.
+2. Turn on Developer Mode: Settings → Privacy & Security → Developer Mode, then restart when asked. Xcode won't register a
+   device with it off.
+
+After the install:
+
+1. Trust your certificate: Settings → General → VPN & Device Management → your Apple ID → Trust. Until then the app won't
+   open.
+2. Open Backburner and tap Allow when it asks to find devices on your local network. Without it the app can't download
+   the model's half from the Mac (`phone-push.py` fails with "The Internet connection appears to be offline").
 
 ## Making the IPA (maintainers)
 
